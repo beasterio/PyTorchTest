@@ -7,6 +7,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 find_package(Vulkan REQUIRED)
 include_directories(${Vulkan_INCLUDE_DIRS})
 
+execute_process(COMMAND python ${CMAKE_CURRENT_LIST_DIR}/pack_data.py)
+
 file(GLOB sources
      "src/*.h"
      "src/*.cpp"
