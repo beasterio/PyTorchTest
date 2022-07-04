@@ -2,6 +2,8 @@
 #include <torch/torch.h>
 #include <torch/script.h>
 
+#include "VulkanGPUDevice.h"
+
 std::vector<std::string> GetSupportedExtensions() {
     uint32_t count;
     vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
@@ -24,7 +26,6 @@ int main() {
     {
         auto container = torch::jit::load(filename, torch::DeviceType::CPU);
         torch::Tensor tensor = container.attr("bps.pth").toTensor();
-        std::cout << "tensor=" << tensor << std::endl;
     }
     catch (std::exception& e)
     {
@@ -32,6 +33,8 @@ int main() {
         std::cerr << e.what() << "\n";
         return -1;
     }
+
+    VulkanGPUDevice device;
 
     std::cout << "ok\n";
 
