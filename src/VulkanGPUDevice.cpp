@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+namespace {
+
 vk::PhysicalDevice GetPhysDevice(const vk::Instance& instance)
 {
     const auto devices = instance.enumeratePhysicalDevices();
@@ -37,6 +39,8 @@ vk::Device GetComputeDevice(const vk::Instance& instance, const vk::PhysicalDevi
     return phys_device.createDevice(device_create_info);
 }
 
+} // anonymous namespace
+
 VulkanGPUDevice::VulkanGPUDevice()
 {
     vk::ApplicationInfo app_info{
@@ -61,7 +65,13 @@ VulkanGPUDevice::VulkanGPUDevice()
 
 VulkanGPUDevice::~VulkanGPUDevice()
 {
+    shaders_.clear();
     device_.destroy();
     instance_.destroy();
 }
 
+ComputeShader& VulkanGPUDevice::CreateShader(const std::string& filename)
+{
+    shaders_.emplace_back(device_, phys_device_, compute_queue_index_, filename);
+    return shaders_.back();
+}

@@ -1,24 +1,11 @@
-#include <vulkan/vulkan.hpp>
 #include <torch/torch.h>
 #include <torch/script.h>
 
 #include "VulkanGPUDevice.h"
 
-std::vector<std::string> GetSupportedExtensions() {
-    uint32_t count;
-    vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
-
-    std::vector<VkExtensionProperties> extensions(count);
-    vkEnumerateInstanceExtensionProperties(nullptr, &count, extensions.data());
-    std::vector<std::string> results;
-    for (auto& extension : extensions) {
-        results.push_back(extension.extensionName);
-    }
-    return results;
-}
 
 int main() {
-    std::cout << GetSupportedExtensions() << std::endl;
+    VulkanGPUDevice device;
 
     const std::string filename = "packed_data.pt";
 
@@ -34,7 +21,6 @@ int main() {
         return -1;
     }
 
-    VulkanGPUDevice device;
 
     std::cout << "ok\n";
 

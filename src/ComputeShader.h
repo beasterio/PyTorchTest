@@ -7,6 +7,9 @@ class ComputeShader
 {
 public:
 	ComputeShader(const vk::Device& device, const vk::PhysicalDevice& phys_device, uint32_t compute_queue_index, const std::string& filename);
+	ComputeShader(const ComputeShader&) = delete;
+	ComputeShader& operator=(const ComputeShader&) = delete;
+
 	~ComputeShader();
 
 	uint32_t AddBuffer(uint32_t size);
