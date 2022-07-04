@@ -13,5 +13,5 @@ protected:
 	vk::Instance instance_;
 	vk::PhysicalDevice phys_device_;
 	vk::Device device_;
-	uint32_t compute_queue_index;
+	uint32_t compute_queue_index_;
 };

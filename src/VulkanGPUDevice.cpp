@@ -55,8 +55,8 @@ VulkanGPUDevice::VulkanGPUDevice()
 
     instance_ = vk::createInstance(instance_info);
     phys_device_ = GetPhysDevice(instance_);
-    compute_queue_index = GetComputeQueueIndex(phys_device_);
-    device_ = GetComputeDevice(instance_, phys_device_, compute_queue_index);
+    compute_queue_index_ = GetComputeQueueIndex(phys_device_);
+    device_ = GetComputeDevice(instance_, phys_device_, compute_queue_index_);
 }
 
 VulkanGPUDevice::~VulkanGPUDevice()
