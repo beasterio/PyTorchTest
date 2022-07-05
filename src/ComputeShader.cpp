@@ -131,20 +131,15 @@ uint32_t ComputeShader::AddBuffer(const torch::Tensor& tensor)
 
 }
 
-const std::vector<char> ComputeShader::ReadBuffer(uint32_t index)
+void ComputeShader::ReadBuffer(uint32_t index, torch::Tensor& tensor)
 {
     const auto& buffer_data = buffers_data_[index];
     std::vector<char> result;
     result.reserve(buffer_data.size);
 
-    char* out_buffer_ptr = static_cast<char*>(device_.mapMemory(buffer_data.memory, 0, buffer_data.size));
-    for (uint32_t i = 0; i < buffer_data.size; ++i)
-    {
-        result.push_back(out_buffer_ptr[i]);
-    }
+    void* out_buffer_ptr = device_.mapMemory(buffer_data.memory, 0, buffer_data.size);
+    tensor = torch::from_blob(out_buffer_ptr, tensor.sizes(), tensor.dtype());
     device_.unmapMemory(buffer_data.memory);
-
-    return result;
 }
 
 bool ComputeShader::Bind()

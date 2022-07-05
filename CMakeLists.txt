@@ -8,6 +8,7 @@ find_package(Vulkan REQUIRED)
 include_directories(${Vulkan_INCLUDE_DIRS})
 
 execute_process(COMMAND python ${CMAKE_CURRENT_LIST_DIR}/pack_data.py)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/output)
 
 file(GLOB SOURCES
      "src/*.h"

@@ -16,7 +16,7 @@ public:
 	uint32_t AddBuffer(uint32_t size);
 	uint32_t AddBuffer(const std::vector<char>& data);
 	uint32_t AddBuffer(const torch::Tensor& tensor);
-	const std::vector<char> ReadBuffer(uint32_t index);
+	void ReadBuffer(uint32_t index, torch::Tensor& tensor);
 
 	bool Bind();
 	void Execute(uint32_t group_size);
