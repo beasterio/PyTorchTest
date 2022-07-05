@@ -45,13 +45,29 @@ ComputeShader::~ComputeShader()
         device_.destroyBuffer(data.buffer);
     }
 
-    device_.resetCommandPool(command_pool_, vk::CommandPoolResetFlags());
-    device_.destroyCommandPool(command_pool_);
-    device_.destroyDescriptorSetLayout(descriptor_set_layout_);
-    device_.destroyPipelineLayout(pipeline_layout_);
-    device_.destroyPipelineCache(pipeline_cache_);
-    device_.destroyDescriptorPool(descriptor_pool_);
-    device_.destroy(compute_pipeline_);
+    if (command_pool_)
+    {
+        device_.resetCommandPool(command_pool_, vk::CommandPoolResetFlags());
+        device_.destroyCommandPool(command_pool_);
+    }
+
+    if (descriptor_set_layout_)
+    {
+        device_.destroyDescriptorSetLayout(descriptor_set_layout_);
+        device_.destroyPipelineLayout(pipeline_layout_);
+        device_.destroyPipelineCache(pipeline_cache_);
+    }
+
+    if (descriptor_pool_)
+    {
+        device_.destroyDescriptorPool(descriptor_pool_);
+    }
+
+    if (compute_pipeline_)
+    {
+        device_.destroy(compute_pipeline_);
+    }
+
     device_.destroy(shader_module_);
 }
 
@@ -69,9 +85,9 @@ uint32_t ComputeShader::AddBuffer(uint32_t size)
     };
 
     vk::Buffer buffer = device_.createBuffer(BufferCreateInfo);
-    vk::MemoryRequirements InBufferMemoryRequirements = device_.getBufferMemoryRequirements(buffer);
+    vk::MemoryRequirements memory_requirements = device_.getBufferMemoryRequirements(buffer);
 
-    vk::MemoryAllocateInfo buffer_memory_allocate_info(size, memory_type_index_);
+    vk::MemoryAllocateInfo buffer_memory_allocate_info(memory_requirements.size, memory_type_index_);
     vk::DeviceMemory memory = device_.allocateMemory(buffer_memory_allocate_info);
 
     device_.bindBufferMemory(buffer, memory, 0);
@@ -79,7 +95,7 @@ uint32_t ComputeShader::AddBuffer(uint32_t size)
     Buffer result{ buffer, memory, size };
     buffers_data_.push_back(result);
 
-    return buffers_data_.size();
+    return buffers_data_.size() - 1;
 }
 
 uint32_t ComputeShader::AddBuffer(const std::vector<char>& data)
@@ -97,6 +113,24 @@ uint32_t ComputeShader::AddBuffer(const std::vector<char>& data)
     return index;
 }
 
+uint32_t ComputeShader::AddBuffer(const torch::Tensor& tensor)
+{
+    const auto & storage = tensor.storage();
+    const auto index = AddBuffer(storage.nbytes());
+    const auto& buffer_data = buffers_data_[index];
+
+    char* data_ptr = static_cast<char*>(storage.data());
+    char* buffer_ptr = static_cast<char*>(device_.mapMemory(buffer_data.memory, 0, storage.nbytes()));
+    for (int32_t i = 0; i < storage.nbytes(); ++i)
+    {
+        buffer_ptr[i] = data_ptr[i];
+    }
+    device_.unmapMemory(buffer_data.memory);
+
+    return index;
+
+}
+
 const std::vector<char> ComputeShader::ReadBuffer(uint32_t index)
 {
     const auto& buffer_data = buffers_data_[index];
@@ -112,7 +146,6 @@ const std::vector<char> ComputeShader::ReadBuffer(uint32_t index)
 
     return result;
 }
-
 
 bool ComputeShader::Bind()
 {
@@ -161,7 +194,7 @@ bool ComputeShader::Bind()
     for (uint32_t i = 0; i < buffers_data_.size(); ++i)
     {
         vk::DescriptorBufferInfo buffer_info(buffers_data_[i].buffer, 0, buffers_data_[i].size);
-        write_descriptor_sets.emplace_back(descriptor_set_, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info);
+        write_descriptor_sets.emplace_back(descriptor_set_, i, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info);
     }
 
     device_.updateDescriptorSets(write_descriptor_sets, {});
