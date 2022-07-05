@@ -9,12 +9,12 @@ include_directories(${Vulkan_INCLUDE_DIRS})
 
 execute_process(COMMAND python ${CMAKE_CURRENT_LIST_DIR}/pack_data.py)
 
-file(GLOB sources
+file(GLOB SOURCES
      "src/*.h"
      "src/*.cpp"
 )
 
-add_executable(pytorchtest ${sources})
+add_executable(pytorchtest ${SOURCES})
 target_link_libraries(pytorchtest "${TORCH_LIBRARIES}" "${Vulkan_LIBRARIES}")
 
 # The following code block is suggested to be used on Windows.
@@ -28,3 +28,25 @@ if (MSVC)
                      ${TORCH_DLLS}
                      $<TARGET_FILE_DIR:pytorchtest>)
 endif (MSVC)
+
+# compile shader sources into spirv before each build.
+file(GLOB GLSL_SOURCE_FILES
+    "shaders/*.comp"
+)
+
+foreach(GLSL ${GLSL_SOURCE_FILES})
+  get_filename_component(FILE_NAME ${GLSL} NAME_WE)
+  set(SPIRV "shaders/${FILE_NAME}.spv")
+  add_custom_command(
+    OUTPUT ${SPIRV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory "shaders"
+    COMMAND glslc ${GLSL} -o ${SPIRV}
+    DEPENDS ${GLSL})
+  list(APPEND SPIRV_BINARY_FILES ${SPIRV})
+endforeach(GLSL)
+
+add_custom_target(
+    shaders 
+    DEPENDS ${SPIRV_BINARY_FILES}
+    )
+add_dependencies(pytorchtest shaders)

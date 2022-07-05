@@ -1,0 +1,40 @@
+#version 430 core
+
+layout (local_size_x = 32) in;
+
+layout(std430, binding=0) buffer input_geometry_parameters_buffer {
+    int geometry_parameters[];
+};
+layout(std430, binding=1) buffer input_coords_buffer {
+    int coords[];
+};
+layout(std430, binding=2) buffer input_bps_buffer {
+    int bps[];
+};
+layout(std430, binding=3) buffer input_spheres_buffer {
+    int spheres[];
+};
+layout(std430, binding=4) buffer input_sd_ground_truth_buffer {
+    int sd_ground_truth[];
+};
+layout(std430, binding=5) buffer input_grad_gt_buffer {
+    int grad_gt[];
+};
+
+layout(std430, binding=6) buffer output_d_y3_d_coords_buffer {
+    float d_y3_d_coords[];
+};
+layout(std430, binding=7) buffer output_loss_l1_deriv_buffer {
+    float loss_l1_deriv[];
+};
+layout(std430, binding=8) buffer output_positions_buffer {
+    float positions[];
+};
+layout(std430, binding=9) buffer output_nn_4th_layer_buffer {
+    float nn_4th_layer[];
+};
+
+void main()
+{
+
+}
