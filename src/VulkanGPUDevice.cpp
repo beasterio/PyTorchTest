@@ -51,7 +51,7 @@ VulkanGPUDevice::VulkanGPUDevice()
     VK_API_VERSION_1_3
     };
 
-    const std::vector<const char*> layers = { "VK_LAYER_KHRONOS_validation" };
+    const std::vector<const char*> layers = { /*"VK_LAYER_KHRONOS_validation"*/ };
     vk::InstanceCreateInfo instance_info(vk::InstanceCreateFlags(),
         &app_info,
         layers.size(),
