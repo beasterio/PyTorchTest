@@ -73,7 +73,7 @@ ComputeShader::~ComputeShader()
 
 uint32_t ComputeShader::AddBuffer(uint32_t size)
 {
-    vk::BufferCreateInfo BufferCreateInfo{
+    vk::BufferCreateInfo buffer_create_info{
         vk::BufferCreateFlags(),
         size,
         vk::BufferUsageFlagBits::eStorageBuffer,
@@ -84,7 +84,7 @@ uint32_t ComputeShader::AddBuffer(uint32_t size)
         &compute_queue_index_
     };
 
-    vk::Buffer buffer = device_.createBuffer(BufferCreateInfo);
+    vk::Buffer buffer = device_.createBuffer(buffer_create_info);
     vk::MemoryRequirements memory_requirements = device_.getBufferMemoryRequirements(buffer);
 
     vk::MemoryAllocateInfo buffer_memory_allocate_info(memory_requirements.size, memory_type_index_);
@@ -115,13 +115,14 @@ uint32_t ComputeShader::AddBuffer(const std::vector<char>& data)
 
 uint32_t ComputeShader::AddBuffer(const torch::Tensor& tensor)
 {
-    const auto & storage = tensor.storage();
-    const auto index = AddBuffer(storage.nbytes());
+    const auto& storage = tensor.storage();
+    const auto data_size_bytes = tensor.numel() * tensor.element_size();
+    const auto index = AddBuffer(data_size_bytes);
     const auto& buffer_data = buffers_data_[index];
 
     char* data_ptr = static_cast<char*>(storage.data());
-    char* buffer_ptr = static_cast<char*>(device_.mapMemory(buffer_data.memory, 0, storage.nbytes()));
-    for (int32_t i = 0; i < storage.nbytes(); ++i)
+    char* buffer_ptr = static_cast<char*>(device_.mapMemory(buffer_data.memory, 0, data_size_bytes));
+    for (int32_t i = 0; i < data_size_bytes; ++i)
     {
         buffer_ptr[i] = data_ptr[i];
     }
@@ -134,11 +135,19 @@ uint32_t ComputeShader::AddBuffer(const torch::Tensor& tensor)
 void ComputeShader::ReadBuffer(uint32_t index, torch::Tensor& tensor)
 {
     const auto& buffer_data = buffers_data_[index];
-    std::vector<char> result;
+    std::vector<float> result;
     result.reserve(buffer_data.size);
 
     void* out_buffer_ptr = device_.mapMemory(buffer_data.memory, 0, buffer_data.size);
+    float* tmp = static_cast<float*>(out_buffer_ptr);
+    for (int i = 0; i < buffer_data.size / sizeof(float); ++i)
+    {
+        result.push_back(tmp[i]);
+    }
+
+
     tensor = torch::from_blob(out_buffer_ptr, tensor.sizes(), tensor.dtype());
+    //std::cout << tensor << std::endl;
     device_.unmapMemory(buffer_data.memory);
 }
 
@@ -185,14 +194,12 @@ bool ComputeShader::Bind()
     const std::vector<vk::DescriptorSet> descriptor_sets = device_.allocateDescriptorSets(descriptor_set_alloc_info);
     descriptor_set_ = descriptor_sets.front();
 
-    std::vector<vk::WriteDescriptorSet> write_descriptor_sets;
     for (uint32_t i = 0; i < buffers_data_.size(); ++i)
     {
         vk::DescriptorBufferInfo buffer_info(buffers_data_[i].buffer, 0, buffers_data_[i].size);
-        write_descriptor_sets.emplace_back(descriptor_set_, i, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info);
+        vk::WriteDescriptorSet desc_set = { descriptor_set_, i, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &buffer_info };
+        device_.updateDescriptorSets({ desc_set }, {});
     }
-
-    device_.updateDescriptorSets(write_descriptor_sets, {});
 
     vk::CommandPoolCreateInfo command_pool_create_info(vk::CommandPoolCreateFlags(), compute_queue_index_);
     command_pool_ = device_.createCommandPool(command_pool_create_info);

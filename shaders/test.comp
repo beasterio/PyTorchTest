@@ -1,24 +1,27 @@
 #version 430 core
+#extension GL_EXT_debug_printf : enable
+
+#define MAX_BPS_SIZE 16 
 
 layout (local_size_x = 32) in;
 
-layout(std430, binding=0) buffer input_geometry_parameters_buffer {
-    int geometry_parameters[];
+layout(std430, binding=0) readonly buffer input_geometry_parameters_buffer {
+    float geometry_parameters[];
 };
-layout(std430, binding=1) buffer input_coords_buffer {
-    int coords[];
+layout(std430, binding=1) readonly buffer input_coords_buffer {
+    float coords[];
 };
-layout(std430, binding=2) buffer input_bps_buffer {
-    int bps[];
+layout(std430, binding=2) readonly buffer input_bps_buffer {
+    float bps[];
 };
-layout(std430, binding=3) buffer input_spheres_buffer {
-    int spheres[];
+layout(std430, binding=3) readonly buffer input_spheres_buffer {
+    vec4 spheres;
 };
-layout(std430, binding=4) buffer input_sd_ground_truth_buffer {
-    int sd_ground_truth[];
+layout(std430, binding=4) readonly buffer input_sd_ground_truth_buffer {
+    float sd_ground_truth[];
 };
-layout(std430, binding=5) buffer input_grad_gt_buffer {
-    int grad_gt[];
+layout(std430, binding=5) readonly buffer input_grad_gt_buffer {
+    float grad_gt[];
 };
 
 layout(std430, binding=6) buffer output_d_y3_d_coords_buffer {
@@ -34,7 +37,134 @@ layout(std430, binding=9) buffer output_nn_4th_layer_buffer {
     float nn_4th_layer[];
 };
 
+const ivec2 subnet_descriptor[] = ivec2[4] (ivec2(16, 64), ivec2(64, 32), ivec2(32, 16), ivec2(16, 1));
+
 void main()
 {
+    const uint id = gl_GlobalInvocationID.x;
+    if (id >= coords.length() / 3)
+    {
+        return;
+    }
 
+    // positions
+    vec3 coords_vec = vec3(coords[3*id], coords[3*id + 1], coords[3*id + 2]);
+    int bps_num = bps.length() / 4;
+    
+    float pos_sign[MAX_BPS_SIZE];
+    for (int i = 0; i < bps_num; ++i)
+    {
+        vec3 n = vec3(bps[4 * i],bps[4*i + 1],bps[4*i + 2]);
+        float d = bps[4 * i + 3];
+
+        n = normalize(n);
+
+        float pos = dot(n, coords_vec) - d;
+
+        positions[id * bps_num + i] = abs(pos);
+        pos_sign[i] = sign(pos);
+    }
+
+    // weights and biases
+    int start = 0;
+    float w0[subnet_descriptor[0].x * subnet_descriptor[0].y];
+    float w1[subnet_descriptor[1].x * subnet_descriptor[1].y];
+    float w2[subnet_descriptor[2].x * subnet_descriptor[2].y];
+    float w3[subnet_descriptor[3].x * subnet_descriptor[3].y];
+
+    float b0[subnet_descriptor[0].y];
+    float b1[subnet_descriptor[1].y];
+    float b2[subnet_descriptor[2].y];
+    float b3;
+
+    // w0, b0
+    for (int i = 0; i < w0.length(); ++i)
+    {
+        w0[i] = geometry_parameters[start + i];
+    }
+    start += w0.length();
+    for (int i = 0; i < b0.length(); ++i)
+    {
+        b0[i] = geometry_parameters[start + i];
+    }
+    start += b0.length();
+
+    // w1, b1
+    for (int i = 0; i < w1.length(); ++i)
+    {
+        w1[i] = geometry_parameters[start + i];
+    }
+    start += w1.length();
+    for (int i = 0 ;i < b1.length(); ++i)
+    {
+        b1[i] = geometry_parameters[start + i];
+    }
+    start += b1.length();
+
+    // w2, b2
+    for (int i = 0; i < w2.length(); ++i)
+    {
+        w2[i] = geometry_parameters[start + i];
+    }
+    start += w2.length();
+    for (int i = 0; i < b2.length(); ++i)
+    {
+        b2[i] = geometry_parameters[start + i];
+    }
+    start += b2.length();
+
+    // w3, b3
+    for (int i = 0; i < w3.length(); ++i)
+    {
+        w3[i] = geometry_parameters[start + i];
+    }
+    start += w3.length();
+    b3 = geometry_parameters[start];
+
+    // nn_4th_layer
+    float omega_0 = 30.f;
+    float y0[b0.length()];
+    for (int i = 0; i < y0.length(); ++i)
+    {
+        float val = 0.f;
+        for (int j = 0; j < subnet_descriptor[0].x; ++j)
+        {
+            val += positions[id * bps_num + j] * w0[i+ subnet_descriptor[0].y * j];
+        }
+
+        val += b0[i];
+        y0[i] = sin(val * omega_0);
+    }
+
+    float y1[b1.length()];
+    for (int i =0; i < y1.length(); ++i)
+    {
+        float val = 0.f;
+        for (int j = 0; j < subnet_descriptor[1].x; ++j)
+        {
+
+            val += y0[j] * w1[i+ subnet_descriptor[1].y * j];
+        }
+        val += b1[i];
+        y1[i] = sin(val * omega_0);
+    }
+
+    float y2[b2.length()];
+    for (int i =0; i < y2.length(); ++i)
+    {
+        float val = 0.f;
+        for (int j = 0; j < subnet_descriptor[2].x; ++j)
+        {
+
+            val += y1[j] * w2[i+ subnet_descriptor[2].y * j];
+        }
+        val += b2[i];
+        y2[i] = sin(val * omega_0);
+    }
+
+    nn_4th_layer[id] = b3; 
+    for (int i = 0; i < subnet_descriptor[3].x; ++i)
+    {
+        nn_4th_layer[id] += y2[i] * w3[i];
+    }
 }
