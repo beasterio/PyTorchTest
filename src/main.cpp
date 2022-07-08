@@ -3,7 +3,7 @@
 
 #include "VulkanGPUDevice.h"
 
-
+#include <chrono>
 #include <cmath>
 
 
@@ -90,9 +90,11 @@ int main() {
 
     shader.Bind();
 
+    auto start = std::chrono::system_clock::now();
     const auto elements_num = coords.size(0);
     shader.Execute(elements_num / kLocalGroupSize + 1);
     shader.Wait();
+    auto end = std::chrono::system_clock::now();
 
     shader.ReadBuffer(d_y3_d_coords_index, d_y3_d_coords);
     shader.ReadBuffer(loss_l1_deriv_index, loss_l1_deriv);
@@ -102,13 +104,15 @@ int main() {
     // validate results
     float atol_eps = 1e-06;
     float rtol_eps = 1e-05;
-    
+
     std::cout << "positions is " << (torch::allclose(positions, py_positions, rtol_eps, atol_eps) ? "ok" : "invalid") << std::endl;
     std::cout << "nn_4th_layer is " << (torch::allclose(nn_4th_layer, py_nn_4th_layer, rtol_eps, atol_eps) ? "ok" : "invalid") << std::endl;
     std::cout << "loss_l1_deriv is " << (torch::allclose(loss_l1_deriv, py_loss_l1_deriv, rtol_eps, atol_eps) ? "ok" : "invalid") << std::endl;
-    
+
     // Seems pytorch calculate gradient in a bit different way, some values are not that accurate.
     std::cout << "d_y3_d_coords is " << (torch::allclose(d_y3_d_coords, py_d_y3_d_coords, rtol_eps, 0.01) ? "ok" : "invalid") << std::endl;
+
+    std::cout << "Time to run compute shader: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
 
     return 0;
 }

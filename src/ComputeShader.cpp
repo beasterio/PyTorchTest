@@ -41,8 +41,8 @@ ComputeShader::~ComputeShader()
 {
     for (const auto& data : buffers_data_)
     {
-        device_.freeMemory(data.memory);
         device_.destroyBuffer(data.buffer);
+        device_.freeMemory(data.memory);
     }
 
     if (command_pool_)

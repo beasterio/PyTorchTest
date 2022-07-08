@@ -38,73 +38,13 @@ layout(std430, binding=9) buffer output_nn_4th_layer_buffer {
 
 const ivec2 subnet_descriptor[] = ivec2[4] (ivec2(16, 64), ivec2(64, 32), ivec2(32, 16), ivec2(16, 1));
 
-float w0[subnet_descriptor[0].x * subnet_descriptor[0].y];
-float w1[subnet_descriptor[1].x * subnet_descriptor[1].y];
-float w2[subnet_descriptor[2].x * subnet_descriptor[2].y];
-float w3[subnet_descriptor[3].x * subnet_descriptor[3].y];
-
-float b0[subnet_descriptor[0].y];
-float b1[subnet_descriptor[1].y];
-float b2[subnet_descriptor[2].y];
-float b3;
-
-
-
-void subdivide_params()
-{
-    int start = 0;
-    // w0, b0
-    for (int i = 0; i < w0.length(); ++i)
-    {
-        w0[i] = geometry_parameters[start + i];
-    }
-    start += w0.length();
-    for (int i = 0; i < b0.length(); ++i)
-    {
-        b0[i] = geometry_parameters[start + i];
-    }
-    start += b0.length();
-
-    // w1, b1
-    for (int i = 0; i < w1.length(); ++i)
-    {
-        w1[i] = geometry_parameters[start + i];
-    }
-    start += w1.length();
-    for (int i = 0 ;i < b1.length(); ++i)
-    {
-        b1[i] = geometry_parameters[start + i];
-    }
-    start += b1.length();
-
-    // w2, b2
-    for (int i = 0; i < w2.length(); ++i)
-    {
-        w2[i] = geometry_parameters[start + i];
-    }
-    start += w2.length();
-    for (int i = 0; i < b2.length(); ++i)
-    {
-        b2[i] = geometry_parameters[start + i];
-    }
-    start += b2.length();
-
-    // w3, b3
-    for (int i = 0; i < w3.length(); ++i)
-    {
-        w3[i] = geometry_parameters[start + i];
-    }
-    start += w3.length();
-    b3 = geometry_parameters[start];
-}
-
 float[POS_VEC_SIZE] calc_position(vec3 coords_vec)
 {
     float result[POS_VEC_SIZE];
-    for (int i = 0; i < POS_VEC_SIZE; ++i)
+    for (int i = 0, offset = 0; i < POS_VEC_SIZE; ++i, offset += 4)
     {
-        vec3 n = vec3(bps[4 * i],bps[4*i + 1],bps[4*i + 2]);
-        float d = bps[4 * i + 3];
+        vec3 n = vec3(bps[offset],bps[offset + 1],bps[offset + 2]);
+        float d = bps[offset + 3];
 
         n = normalize(n);
 
@@ -119,49 +59,61 @@ float calc_nn_4th_layer(float pos_array[POS_VEC_SIZE])
 {
     float omega_0 = 30.f;
 
-    float y0[b0.length()];
+    int start = 0;
+    int w_size = subnet_descriptor[0].x * subnet_descriptor[0].y;
+    float y0[subnet_descriptor[0].y];
     for (int i = 0; i < y0.length(); ++i)
     {
         float val = 0.f;
-        for (int j = 0; j < subnet_descriptor[0].x; ++j)
+        int offset = start + i;
+        val += geometry_parameters[offset + w_size];
+
+        for (int j = 0; j < subnet_descriptor[0].x; ++j, offset += subnet_descriptor[0].y)
         {
-            val += pos_array[j] * w0[i + subnet_descriptor[0].y * j];
+            val += pos_array[j] * geometry_parameters[offset];
         }
 
-        val += b0[i];
         y0[i] = sin(val * omega_0);
     }
 
-    float y1[b1.length()];
-    for (int i =0; i < y1.length(); ++i)
+    start += w_size + subnet_descriptor[0].y;
+    w_size = subnet_descriptor[1].x * subnet_descriptor[1].y;
+    float y1[subnet_descriptor[1].y];
+    for (int i = 0; i < y1.length(); ++i)
     {
         float val = 0.f;
-        for (int j = 0; j < subnet_descriptor[1].x; ++j)
-        {
+        int offset = start + i;
+        val += geometry_parameters[offset + w_size];
 
-            val += y0[j] * w1[i+ subnet_descriptor[1].y * j];
+        for (int j = 0; j < subnet_descriptor[1].x; ++j, offset += subnet_descriptor[1].y)
+        {
+            val += y0[j] * geometry_parameters[offset];
         }
-        val += b1[i];
         y1[i] = sin(val * omega_0);
     }
 
-    float y2[b2.length()];
-    for (int i =0; i < y2.length(); ++i)
+    start += w_size + subnet_descriptor[1].y;
+    w_size = subnet_descriptor[2].x * subnet_descriptor[2].y;
+    float y2[subnet_descriptor[2].y];
+    for (int i = 0; i < y2.length(); ++i)
     {
         float val = 0.f;
-        for (int j = 0; j < subnet_descriptor[2].x; ++j)
+        int offset = start + i;
+        val += geometry_parameters[offset + w_size];
+        
+        for (int j = 0; j < subnet_descriptor[2].x; ++j, offset += subnet_descriptor[2].y)
         {
-
-            val += y1[j] * w2[i+ subnet_descriptor[2].y * j];
+            val += y1[j] * geometry_parameters[offset];
         }
-        val += b2[i];
         y2[i] = sin(val * omega_0);
     }
 
-   float result = b3; 
+    start += w_size + subnet_descriptor[2].y;
+    w_size = subnet_descriptor[3].x * subnet_descriptor[3].y;
+    float result = geometry_parameters[start + w_size]; 
     for (int i = 0; i < subnet_descriptor[3].x; ++i)
     {
-        result += y2[i] * w3[i];
+        result += y2[i] * geometry_parameters[start + i];
     }
 
     return result;
@@ -190,10 +142,6 @@ void main()
     {
         return;
     }
-    // weights and biases
-    // NOTE: must be done before other functions calculated.
-    // TODO: move to separate compute shader, so its evaulated only once.
-    subdivide_params();
 
     // positions
     vec3 coords_vec = vec3(coords[3*id], coords[3*id + 1], coords[3*id + 2]);
